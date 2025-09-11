@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Langur Burja (Nepali Dice Game)</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(#fbc2eb, #a6c1ee);
+      font-family: Arial, sans-serif;
+    }
+    #game {
+      text-align: center;
+      background: #fff;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 20px;
+      border: none;
+      background: #ff6699;
+      color: white;
+      font-size: 18px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #cc0066;
+    }
+    .result {
+      margin-top: 15px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <h1>🎲 Langur Burja 🎲</h1>
+    <p>You vs Computer</p>
+    <button onclick="playGame()">Roll Dice</button>
+    <div class="result" id="player"></div>
+    <div class="result" id="computer"></div>
+    <div class="result" id="winner"></div>
+  </div>
+
+  <script>
+    const symbols = ["🐯 Tiger", "🐐 Goat", "🦁 Lion", "🐔 Hen", "🦆 Duck", "🎲 Dice"];
+
+    function getRandomSymbol() {
+      return symbols[Math.floor(Math.random() * symbols.length)];
+    }
+
+    function playGame() {
+      let playerChoice = getRandomSymbol();
+      let computerChoice = getRandomSymbol();
+
+      // Player always wins
+      document.getElementById("player").innerText = "You rolled: " + playerChoice;
+      document.getElementById("computer").innerText = "Computer rolled: " + computerChoice;
+      document.getElementById("winner").innerText = "🎉 You Win Every Time! 🎉";
+    }
+  </script>
+</body>
+</html>
