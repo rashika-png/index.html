@@ -20,24 +20,45 @@
       padding: 30px;
       border-radius: 15px;
       box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+      max-width: 400px;
+    }
+    select, button {
+      padding: 10px 20px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
     }
     button {
-      padding: 10px 20px;
-      margin-top: 20px;
-      border: none;
       background: #ff6699;
       color: white;
-      font-size: 18px;
-      border-radius: 10px;
       cursor: pointer;
       transition: 0.3s;
     }
     button:hover {
       background: #cc0066;
     }
+    .dice-container {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin: 20px 0;
+    }
+    .dice {
+      font-size: 60px;
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid #444;
+      border-radius: 15px;
+      background: #fafafa;
+      box-shadow: inset 0px 4px 10px rgba(0,0,0,0.2);
+    }
     .result {
       margin-top: 15px;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: bold;
     }
   </style>
@@ -45,28 +66,78 @@
 <body>
   <div id="game">
     <h1>🎲 Langur Burja 🎲</h1>
-    <p>You vs Computer</p>
-    <button onclick="playGame()">Roll Dice</button>
-    <div class="result" id="player"></div>
-    <div class="result" id="computer"></div>
+    <label for="mode">Choose Mode:</label>
+    <select id="mode">
+      <option value="computer">Player vs Computer</option>
+      <option value="pvp">Player vs Player</option>
+    </select>
+    <div class="dice-container">
+      <div class="dice" id="playerDice">❓</div>
+      <div class="dice" id="opponentDice">❓</div>
+    </div>
+    <button onclick="rollDice()">Roll Dice</button>
     <div class="result" id="winner"></div>
   </div>
 
+  <!-- Dice roll sound -->
+  <audio id="diceSound" src="https://www.myinstants.com/media/sounds/dice-roll.mp3"></audio>
+
   <script>
-    const symbols = ["🐯 Tiger", "🐐 Goat", "🦁 Lion", "🐔 Hen", "🦆 Duck", "🎲 Dice"];
+    const symbols = ["🐯", "🐐", "🦁", "🐔", "🦆", "🎲"];
+    const names   = ["Tiger", "Goat", "Lion", "Hen", "Duck", "Dice"];
+
+    let currentPlayer = 1; // for PvP
 
     function getRandomSymbol() {
-      return symbols[Math.floor(Math.random() * symbols.length)];
+      let index = Math.floor(Math.random() * symbols.length);
+      return { symbol: symbols[index], name: names[index] };
     }
 
-    function playGame() {
-      let playerChoice = getRandomSymbol();
-      let computerChoice = getRandomSymbol();
+    function rollDice() {
+      let mode = document.getElementById("mode").value;
+      let playerDice = document.getElementById("playerDice");
+      let opponentDice = document.getElementById("opponentDice");
+      let winnerText = document.getElementById("winner");
+      let diceSound = document.getElementById("diceSound");
 
-      // Player always wins
-      document.getElementById("player").innerText = "You rolled: " + playerChoice;
-      document.getElementById("computer").innerText = "Computer rolled: " + computerChoice;
-      document.getElementById("winner").innerText = "🎉 You Win Every Time! 🎉";
+      // Reset winner text
+      winnerText.innerText = "";
+
+      // Play sound
+      diceSound.currentTime = 0;
+      diceSound.play();
+
+      let rollInterval = setInterval(() => {
+        playerDice.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+        opponentDice.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(rollInterval);
+
+        if (mode === "computer") {
+          // Player vs Computer (player always wins)
+          let player = getRandomSymbol();
+          let computer = getRandomSymbol();
+          playerDice.innerText = player.symbol;
+          opponentDice.innerText = computer.symbol;
+          winnerText.innerText = "🎉 You Win with " + player.name + "! 🎉";
+
+        } else if (mode === "pvp") {
+          // Player vs Player (turn-based)
+          if (currentPlayer === 1) {
+            let player = getRandomSymbol();
+            playerDice.innerText = player.symbol;
+            winnerText.innerText = "✅ Player 1 rolled: " + player.name + ". Now Player 2's turn!";
+            currentPlayer = 2;
+          } else {
+            let player2 = getRandomSymbol();
+            opponentDice.innerText = player2.symbol;
+            winnerText.innerText = "✅ Player 2 rolled: " + player2.name + ". Game Over!";
+            currentPlayer = 1; // reset
+          }
+        }
+      }, 1500);
     }
   </script>
 </body>
