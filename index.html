@@ -1,144 +1,165 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Langur Burja (Nepali Dice Game)</title>
+  <meta charset="utf-8" />
+  <title>KP Runner - Common People Win</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(#fbc2eb, #a6c1ee);
-      font-family: Arial, sans-serif;
-    }
-    #game {
-      text-align: center;
-      background: #fff;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
-      max-width: 400px;
-    }
-    select, button {
-      padding: 10px 20px;
-      margin-top: 15px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-    }
-    button {
-      background: #ff6699;
-      color: white;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    button:hover {
-      background: #cc0066;
-    }
-    .dice-container {
-      display: flex;
-      justify-content: center;
-      gap: 30px;
-      margin: 20px 0;
-    }
-    .dice {
-      font-size: 60px;
-      width: 80px;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: 3px solid #444;
-      border-radius: 15px;
-      background: #fafafa;
-      box-shadow: inset 0px 4px 10px rgba(0,0,0,0.2);
-    }
-    .result {
-      margin-top: 15px;
-      font-size: 18px;
-      font-weight: bold;
+    html,body { margin:0; padding:0; background:#222; }
+    #gameContainer { width:100%; height:100vh; overflow:hidden; }
+    .ui {
+      position: absolute; left: 12px; top: 12px; color: white;
+      font-family: Arial, sans-serif; z-index: 100;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
 </head>
 <body>
-  <div id="game">
-    <h1>🎲 Langur Burja 🎲</h1>
-    <label for="mode">Choose Mode:</label>
-    <select id="mode">
-      <option value="computer">Player vs Computer</option>
-      <option value="pvp">Player vs Player</option>
-    </select>
-    <div class="dice-container">
-      <div class="dice" id="playerDice">❓</div>
-      <div class="dice" id="opponentDice">❓</div>
-    </div>
-    <button onclick="rollDice()">Roll Dice</button>
-    <div class="result" id="winner"></div>
-  </div>
+  <div id="gameContainer"></div>
+  <div class="ui"><span id="scoreText">Score: 0</span></div>
 
-  <!-- Dice roll sound -->
-  <audio id="diceSound" src="https://www.myinstants.com/media/sounds/dice-roll.mp3"></audio>
+<script>
+const config = {
+  type: Phaser.AUTO,
+  parent: 'gameContainer',
+  width: Math.min(900, window.innerWidth),
+  height: Math.min(600, window.innerHeight),
+  physics: { default: 'arcade', arcade: { gravity: { y: 1000 } } },
+  scene: { preload, create, update }
+};
+const game = new Phaser.Game(config);
 
-  <script>
-    const symbols = ["🐯", "🐐", "🦁", "🐔", "🦆", "🎲"];
-    const names   = ["Tiger", "Goat", "Lion", "Hen", "Duck", "Dice"];
+let player, cursors, ground, obstacles, bg, cash;
+let score = 0, scoreTextEl, spawnTimer = 0, started = false;
+let startTimer = 0;
+let flagBorder;
 
-    let currentPlayer = 1; // for PvP
+function preload() {
+  this.load.image('bg', 'bg.png');
+  this.load.image('ground', 'ground.png');
+  this.load.image('people', 'people.png'); // chasers
+  this.load.image('kp', 'kp.png');         // KP sprite
+  this.load.image('cash', 'cash.png');     // cash bag (optional)
+}
 
-    function getRandomSymbol() {
-      let index = Math.floor(Math.random() * symbols.length);
-      return { symbol: symbols[index], name: names[index] };
+function create() {
+  bg = this.add.tileSprite(0, 0, config.width, config.height, 'bg')
+       .setOrigin(0).setScrollFactor(0);
+
+  ground = this.physics.add.staticGroup();
+  ground.create(config.width/2, config.height - 32, 'ground').setScale(2).refreshBody();
+
+  // Nepali flag border (red rect with blue outline)
+  flagBorder = this.add.graphics();
+  flagBorder.lineStyle(20, 0x003893, 1); // blue border
+  flagBorder.fillStyle(0xdc143c, 1);     // crimson red fill
+  flagBorder.fillRect(40, 40, config.width - 80, config.height - 80);
+  flagBorder.strokeRect(40, 40, config.width - 80, config.height - 80);
+  flagBorder.setDepth(0);
+
+  // KP with red hands
+  player = this.physics.add.sprite(config.width/2, config.height - 180, 'kp').setScale(0.7);
+  player.setCollideWorldBounds(true);
+  player.setTintFill(0xff6666);
+
+  // Cash bag floating over KP
+  cash = this.add.sprite(player.x + 40, player.y - 60, 'cash').setScale(0.5);
+  if (cash) {
+    this.tweens.add({
+      targets: cash,
+      y: cash.y - 15,
+      yoyo: true,
+      repeat: -1,
+      duration: 800,
+      ease: 'Sine.inOut'
+    });
+  }
+
+  obstacles = this.physics.add.group();
+  this.physics.add.collider(player, ground);
+  this.physics.add.overlap(player, obstacles, onHit, null, this);
+
+  cursors = this.input.keyboard.createCursorKeys();
+  this.input.on('pointerdown', () => jump());
+
+  scoreTextEl = document.getElementById('scoreText');
+
+  // Intro text
+  this.add.text(config.width/2 - 160, 70,
+    'KP flaunts cash with red hands...\nNepali People are coming!',
+    { fontSize: '22px', fill:'#fff', align: 'center' });
+}
+
+function update(time, delta) {
+  bg.tilePositionX += 2;
+
+  // Intro delay before game starts
+  if (!started) {
+    startTimer += delta;
+    if (startTimer > 3000) { // 3 sec
+      started = true;
+      // Fade out flag border
+      this.tweens.add({
+        targets: flagBorder,
+        alpha: 0,
+        duration: 1500
+      });
+    } else {
+      return; // freeze gameplay until intro done
     }
+  }
 
-    function rollDice() {
-      let mode = document.getElementById("mode").value;
-      let playerDice = document.getElementById("playerDice");
-      let opponentDice = document.getElementById("opponentDice");
-      let winnerText = document.getElementById("winner");
-      let diceSound = document.getElementById("diceSound");
+  spawnTimer += delta;
+  if (spawnTimer > 1200) {
+    spawnTimer = 0;
+    spawnPeople(this);
+  }
 
-      // Reset winner text
-      winnerText.innerText = "";
+  if (cursors.space.isDown || cursors.up.isDown) jump();
 
-      // Play sound
-      diceSound.currentTime = 0;
-      diceSound.play();
+  obstacles.getChildren().forEach(o => { if (o.x < -100) o.destroy(); });
 
-      let rollInterval = setInterval(() => {
-        playerDice.innerText = symbols[Math.floor(Math.random() * symbols.length)];
-        opponentDice.innerText = symbols[Math.floor(Math.random() * symbols.length)];
-      }, 100);
+  score += Math.floor(delta * 0.02);
+  scoreTextEl.textContent = 'Score: ' + score;
+}
 
-      setTimeout(() => {
-        clearInterval(rollInterval);
+function jump() {
+  if (player.body.touching.down) player.setVelocityY(-480);
+}
 
-        if (mode === "computer") {
-          // Player vs Computer (player always wins)
-          let player = getRandomSymbol();
-          let computer = getRandomSymbol();
-          playerDice.innerText = player.symbol;
-          opponentDice.innerText = computer.symbol;
-          winnerText.innerText = "🎉 You Win with " + player.name + "! 🎉";
+function spawnPeople(scene) {
+  const x = config.width + 80;
+  const y = config.height - 80;
+  const chaser = obstacles.create(x, y, 'people').setOrigin(0.5, 1).setScale(0.8);
+  chaser.setVelocityX(-300);
+  chaser.body.setAllowGravity(false);
+}
 
-        } else if (mode === "pvp") {
-          // Player vs Player (turn-based)
-          if (currentPlayer === 1) {
-            let player = getRandomSymbol();
-            playerDice.innerText = player.symbol;
-            winnerText.innerText = "✅ Player 1 rolled: " + player.name + ". Now Player 2's turn!";
-            currentPlayer = 2;
-          } else {
-            let player2 = getRandomSymbol();
-            opponentDice.innerText = player2.symbol;
-            winnerText.innerText = "✅ Player 2 rolled: " + player2.name + ". Game Over!";
-            currentPlayer = 1; // reset
-          }
-        }
-      }, 1500);
-    }
-  </script>
+function onHit(playerObj, obstacle) {
+  game.scene.scenes[0].physics.pause();
+  playerObj.setTint(0xff0000);
+
+  const w = config.width, h = config.height;
+  const scene = game.scene.scenes[0];
+  const msg = scene.add.text(w/2, h/2, 'KP Chor Desh Xod',
+    { fontSize: '32px', fill:'#ff4444', fontStyle:'bold' }).setOrigin(0.5);
+
+  // Flashing + shaking animation
+  scene.tweens.add({
+    targets: msg,
+    alpha: 0,
+    duration: 200,
+    yoyo: true,
+    repeat: -1
+  });
+  scene.tweens.add({
+    targets: msg,
+    x: w/2 + 10,
+    duration: 100,
+    yoyo: true,
+    repeat: -1
+  });
+}
+</script>
 </body>
 </html>
